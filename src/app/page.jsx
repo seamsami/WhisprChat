@@ -1,190 +1,32 @@
-"use client";
-import React, { useState, useEffect, useRef } from "react";
+'use client';
 
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
+export default function Home() {
+  const router = useRouter();
 
-import { useUpload } from "../utilities/runtime-helpers";
-import { useUser } from "../utilities/hooks/useUser"; // adjust path as needed
-import { useAuth } from "../utilities/hooks/useAuth"; // adjust relative path as needed
-
-
-
-function MainComponent() {
-  const { data: user, loading: userLoading } = useUser();
-  const { signOut } = useAuth();
-  const [upload, { loading: uploadLoading }] = useUpload();
-
-  // Core state
-  const [activeChat, setActiveChat] = useState(null);
-  const [chats, setChats] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // UI state
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("chats");
-  const [showNewChatModal, setShowNewChatModal] = useState(false);
-  const [showGroupModal, setShowGroupModal] = useState(false);
-  const [showCallModal, setShowCallModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
-
-  // Message input state
-  const [messageText, setMessageText] = useState("");
-  const [replyToMessage, setReplyToMessage] = useState(null);
-  const [editingMessage, setEditingMessage] = useState(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [typing, setTyping] = useState(false);
-
-  // Search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [messageSearchQuery, setMessageSearchQuery] = useState("");
-  const [messageSearchResults, setMessageSearchResults] = useState([]);
-
-  // User search for new chats
-  const [userSearchQuery, setUserSearchQuery] = useState("");
-  const [userSearchResults, setUserSearchResults] = useState([]);
-  const [userSearchLoading, setUserSearchLoading] = useState(false);
-
-  // Media and file sharing
-  const [showMediaModal, setShowMediaModal] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [mediaPreview, setMediaPreview] = useState(null);
-
-  // Voice recording
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioChunks, setAudioChunks] = useState([]);
-
-  // AI features
-  const [aiSuggestions, setAiSuggestions] = useState([]);
-  const [showTranslation, setShowTranslation] = useState({});
-  const [translatedMessages, setTranslatedMessages] = useState({});
-  const [aiLoading, setAiLoading] = useState(false);
-
-  // Message reactions
-  const [messageReactions, setMessageReactions] = useState({});
-  const [showReactionPicker, setShowReactionPicker] = useState({});
-
-  // WebSocket connection
-  const [ws, setWs] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState("disconnected");
-  const [onlineUsers, setOnlineUsers] = useState(new Set());
-
-  // Refs
-  const messagesEndRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const recordingIntervalRef = useRef(null);
-  const typingTimeoutRef = useRef(null);
-
-  // Load initial data
   useEffect(() => {
-    if (user) {
-      loadUserData();
-      initializeWebSocket();
-    }
-  }, [user]);
-
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Search users when query changes
-  useEffect(() => {
-    if (userSearchQuery.trim().length > 0) {
-      searchUsers();
+    // Check for user token in cookies
+    const token = document.cookie.split('; ').some(row => row.startsWith('user_token='));
+    
+    if (token) {
+      router.push('/chat');
     } else {
-      setUserSearchResults([]);
+      router.push('/login');
     }
-  }, [userSearchQuery]);
+  }, [router]);
 
-  // Search messages when query changes
-  useEffect(() => {
-    if (messageSearchQuery.trim().length > 0) {
-      searchMessages();
-    } else {
-      setMessageSearchResults([]);
-    }
-  }, [messageSearchQuery]);
-
-  const loadUserData = async () => {
-    try {
-      // Load user profile
-      const profileResponse = await fetch("/api/get-user-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      if (profileResponse.ok) {
-        const profileData = await profileResponse.json();
-        setUserProfile(profileData);
-      }
-
-      // Load chats
-      const chatsResponse = await fetch("/api/list-user-chats", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      });
-
-      if (chatsResponse.ok) {
-        const chatsData = await chatsResponse.json();
-        setChats(chatsData || []);
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      setError("Failed to load user data");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const initializeWebSocket = () => {
-    try {
-      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8080";
-      const websocket = new WebSocket(wsUrl);
-
-      websocket.onopen = () => {
-        setConnectionStatus("connected");
-        websocket.send(
-          JSON.stringify({
-            type: "authenticate",
-            userId: user.id,
-          })
-        );
-      };
-
-      websocket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        handleWebSocketMessage(data);
-      };
-
-      websocket.onclose = () => {
-        setConnectionStatus("disconnected");
-        // Attempt to reconnect after 3 seconds
-        setTimeout(() => {
-          if (user) initializeWebSocket();
-        }, 3000);
-      };
-
-      websocket.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        setConnectionStatus("error");
-      };
-
-      setWs(websocket);
-    } catch (error) {
-      console.error("Failed to initialize WebSocket:", error);
-      setConnectionStatus("error");
-    }
-  };
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold mb-4">WhisprChat</h1>
+        <p className="text-gray-600 mb-6">Redirecting...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+      </div>
+    </div>
+  );
+}
 
   const handleWebSocketMessage = (data) => {
     switch (data.type) {
