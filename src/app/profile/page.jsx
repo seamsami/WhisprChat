@@ -1,7 +1,9 @@
 "use client";
-import React from "react";
+import React, { useState, useEffect } from "react";
+import { useUser } from "../../utilities/hooks/useUser";
+import { useAuth } from "../../utilities/hooks/useAuth";
 
-import { useUpload } from "../utilities/runtime-helpers";
+import { useUpload } from "../../utilities/runtime-helpers";
 
 function MainComponent() {
   const { data: user, loading: userLoading } = useUser();

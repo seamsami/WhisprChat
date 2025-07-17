@@ -148,9 +148,7 @@ function MainComponent() {
 
   const initializeWebSocket = () => {
     try {
-      const wsUrl = `${
-        window.location.protocol === "https:" ? "wss:" : "ws:"
-      }//${window.location.host}/api/websocket-handler`;
+      const wsUrl = process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:8080";
       const websocket = new WebSocket(wsUrl);
 
       websocket.onopen = () => {
